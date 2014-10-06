@@ -1,8 +1,6 @@
-// Emacs style mode select   -*- C++ -*-
-//-----------------------------------------------------------------------------
 //
 // Copyright(C) 1993-1996 Id Software, Inc.
-// Copyright(C) 2005 Simon Howard
+// Copyright(C) 2005-2014 Simon Howard
 // Copyright(C) 2006 Ben Ryves 2006
 //
 // This program is free software; you can redistribute it and/or
@@ -15,17 +13,11 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-// 02111-1307, USA.
-//
 // mus2mid.c - Ben Ryves 2006 - http://benryves.com - benryves@benryves.com
 // Use to convert a MUS file into a single track, type 0 MIDI file.
 
 #include <stdio.h>
 
-#include "doomdef.h"
 #include "doomtype.h"
 #include "i_swap.h"
 
@@ -691,4 +683,47 @@ boolean mus2mid(MEMFILE *musinput, MEMFILE *midioutput)
 
     return false;
 }
+
+#ifdef STANDALONE
+
+#include "m_misc.h"
+#include "z_zone.h"
+
+int main(int argc, char *argv[])
+{
+    MEMFILE *src, *dst;
+    byte *infile;
+    long infile_len;
+    void *outfile;
+    size_t outfile_len;
+
+    if (argc != 3)
+    {
+        printf("Usage: %s <musfile> <midfile>\n", argv[0]);
+        exit(-1);
+    }
+
+    Z_Init();
+
+    infile_len = M_ReadFile(argv[1], &infile);
+
+    src = mem_fopen_read(infile, infile_len);
+    dst = mem_fopen_write();
+
+    if (mus2mid(src, dst))
+    {
+        fprintf(stderr, "mus2mid() failed\n");
+        exit(-1);
+    }
+
+    // Write result to output file:
+
+    mem_get_buf(dst, &outfile, &outfile_len);
+
+    M_WriteFile(argv[2], outfile, outfile_len);
+
+    return 0;
+}
+
+#endif
 

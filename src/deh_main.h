@@ -1,7 +1,5 @@
-// Emacs style mode select   -*- C++ -*- 
-//-----------------------------------------------------------------------------
 //
-// Copyright(C) 2005 Simon Howard
+// Copyright(C) 2005-2014 Simon Howard
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -13,24 +11,16 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-// 02111-1307, USA.
-//
-//-----------------------------------------------------------------------------
 //
 // Dehacked entrypoint and common code
 //
-//-----------------------------------------------------------------------------
 
 #ifndef DEH_MAIN_H
 #define DEH_MAIN_H
 
-#include <stdio.h>
-
 #include "doomtype.h"
 #include "doomfeatures.h"
+#include "deh_str.h"
 #include "sha1.h"
 
 // These are the limits that dehacked uses (from dheinit.h in the dehacked
@@ -42,33 +32,14 @@
 
 void DEH_Init(void);
 int DEH_LoadFile(char *filename);
-int DEH_LoadLump(int lumpnum);
-int DEH_LoadLumpByName(char *name);
+int DEH_LoadLump(int lumpnum, boolean allow_long, boolean allow_error);
+int DEH_LoadLumpByName(char *name, boolean allow_long, boolean allow_error);
 
 boolean DEH_ParseAssignment(char *line, char **variable_name, char **value);
 
 void DEH_Checksum(sha1_digest_t digest);
 
-// deh_text.c:
-//
-// Used to do dehacked text substitutions throughout the program
-
-#ifdef FEATURE_DEHACKED
-
-char *DEH_String(char *s);
-void DEH_printf(char *fmt, ...);
-void DEH_fprintf(FILE *fstream, char *fmt, ...);
-void DEH_snprintf(char *buffer, size_t len, char *fmt, ...);
-
-#else
-
-#define DEH_String(x) (x)
-#define DEH_printf printf
-#define DEH_fprintf fprintf
-#define DEH_snprintf snprintf
-
-#endif
-
+extern boolean deh_allow_extended_strings;
 extern boolean deh_allow_long_strings;
 extern boolean deh_allow_long_cheats;
 extern boolean deh_apply_cheats;

@@ -1,7 +1,5 @@
-// Emacs style mode select   -*- C++ -*- 
-//-----------------------------------------------------------------------------
 //
-// Copyright(C) 2006 Simon Howard
+// Copyright(C) 2005-2014 Simon Howard
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -13,17 +11,14 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-// 02111-1307, USA.
-//
 
 #include <stdlib.h>
+#include <stdarg.h>
 #include <string.h>
 
 #include "doomkeys.h"
 
+#include "txt_label.h"
 #include "txt_desktop.h"
 #include "txt_gui.h"
 #include "txt_io.h"
@@ -500,5 +495,26 @@ void TXT_SetMouseListener(txt_window_t *window,
 void TXT_SetWindowFocus(txt_window_t *window, int focused)
 {
     TXT_SetWidgetFocus(window, focused);
+}
+
+txt_window_t *TXT_MessageBox(char *title, char *message, ...)
+{
+    txt_window_t *window;
+    char buf[256];
+    va_list args;
+
+    va_start(args, message);
+    TXT_vsnprintf(buf, sizeof(buf), message, args);
+    va_end(args);
+
+    window = TXT_NewWindow(title);
+    TXT_AddWidget(window, TXT_NewLabel(buf));
+
+    TXT_SetWindowAction(window, TXT_HORIZ_LEFT, NULL);
+    TXT_SetWindowAction(window, TXT_HORIZ_CENTER, 
+                        TXT_NewWindowEscapeAction(window));
+    TXT_SetWindowAction(window, TXT_HORIZ_RIGHT, NULL);
+
+    return window;
 }
 

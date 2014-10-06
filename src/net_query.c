@@ -1,7 +1,5 @@
-// Emacs style mode select   -*- C++ -*- 
-//-----------------------------------------------------------------------------
 //
-// Copyright(C) 2005 Simon Howard
+// Copyright(C) 2005-2014 Simon Howard
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -13,17 +11,14 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-// 02111-1307, USA.
-//
 // DESCRIPTION:
 //     Querying servers to find their current status.
 //
 
+#include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "i_system.h"
 #include "i_timer.h"
@@ -79,9 +74,8 @@ typedef struct
     boolean printed;
 } query_target_t;
 
-// Transmit a query packet
-
 static boolean registered_with_master = false;
+static boolean got_master_response = false;
 
 static net_context_t *query_context;
 static query_target_t *targets;
@@ -156,7 +150,22 @@ void NET_Query_MasterResponse(net_packet_t *packet)
             printf("Failed to register with master server at %s\n",
                    MASTER_SERVER_ADDRESS);
         }
+
+        got_master_response = true;
     }
+}
+
+boolean NET_Query_CheckAddedToMaster(boolean *result)
+{
+    // Got response from master yet?
+
+    if (!got_master_response)
+    {
+        return false;
+    }
+
+    *result = registered_with_master;
+    return true;
 }
 
 // Send a query to the master server.
@@ -532,10 +541,14 @@ static void NET_Query_QueryLoop(net_query_callback_t callback, void *user_data)
 
 void NET_Query_Init(void)
 {
-    query_context = NET_NewContext();
-    NET_AddModule(query_context, &net_sdl_module);
-    net_sdl_module.InitClient();
+    if (query_context == NULL)
+    {
+        query_context = NET_NewContext();
+        NET_AddModule(query_context, &net_sdl_module);
+        net_sdl_module.InitClient();
+    }
 
+    free(targets);
     targets = NULL;
     num_targets = 0;
 
@@ -646,23 +659,35 @@ static void formatted_printf(int wide, char *s, ...)
 
 static char *GameDescription(GameMode_t mode, GameMission_t mission)
 {
-    switch (mode)
+    switch (mission)
     {
-        case shareware:
-            return "shareware";
-        case registered:
-            return "registered";
-        case retail:
-            return "ultimate";
-        case commercial:
-            if (mission == doom2)
-                return "doom2";
-            else if (mission == pack_tnt)
-                return "tnt";
-            else if (mission == pack_plut)
-                return "plutonia";
+        case doom:
+            if (mode == shareware)
+                return "swdoom";
+            else if (mode == registered)
+                return "regdoom";
+            else if (mode == retail)
+                return "ultdoom";
+            else
+                return "doom";
+        case doom2:
+            return "doom2";
+        case pack_tnt:
+            return "tnt";
+        case pack_plut:
+            return "plutonia";
+        case pack_chex:
+            return "chex";
+        case pack_hacx:
+            return "hacx";
+        case heretic:
+            return "heretic";
+        case hexen:
+            return "hexen";
+        case strife:
+            return "strife";
         default:
-            return "unknown";
+            return "?";
     }
 }
 

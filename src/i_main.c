@@ -1,8 +1,6 @@
-// Emacs style mode select   -*- C++ -*- 
-//-----------------------------------------------------------------------------
 //
 // Copyright(C) 1993-1996 Id Software, Inc.
-// Copyright(C) 2005 Simon Howard
+// Copyright(C) 2005-2014 Simon Howard
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -14,25 +12,27 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-// 02111-1307, USA.
-//
 // DESCRIPTION:
 //	Main program, simply calls D_DoomMain high level loop.
 //
-//-----------------------------------------------------------------------------
-
 
 #include "config.h"
 
+#include <stdio.h>
+
 #include "SDL.h"
 
-#include "doomdef.h"
+#include "doomtype.h"
 #include "i_system.h"
 #include "m_argv.h"
-#include "d_main.h"
+
+//
+// D_DoomMain()
+// Not a globally visible function, just included for source reference,
+// calls all startup code, parses command line options.
+//
+
+void D_DoomMain (void);
 
 #if defined(_WIN32_WCE)
 
@@ -71,7 +71,6 @@ static void LockCPUAffinity(void)
         fprintf(stderr, "Failed to load kernel32.dll\n");
         return;
     }
-
     // Find the SetProcessAffinityMask function.
 
     SetAffinity = (SetAffinityFunc)GetProcAddress(kernel32_dll, "SetProcessAffinityMask");
@@ -133,19 +132,12 @@ int main(int argc, char **argv)
     myargc = argc;
     myargv = argv;
 
-#ifdef _WIN32_WCE
-
-    // Windows CE has no environment, but SDL provides an implementation.
-    // Populate the environment with the values we normally find.
-
-    PopulateEnvironment();
-
-#endif
-
     // Only schedule on a single core, if we have multiple
     // cores.  This is to work around a bug in SDL_mixer.
 
     LockCPUAffinity();
+
+    M_FindResponseFile();
 
     // start doom
 

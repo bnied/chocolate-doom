@@ -1,8 +1,6 @@
-// Emacs style mode select   -*- C++ -*- 
-//-----------------------------------------------------------------------------
 //
 // Copyright(C) 1993-1996 Id Software, Inc.
-// Copyright(C) 2005 Simon Howard
+// Copyright(C) 2005-2014 Simon Howard
 //
 // This program is free software; you can redistribute it and/or
 // modify it under the terms of the GNU General Public License
@@ -14,15 +12,9 @@
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 // GNU General Public License for more details.
 //
-// You should have received a copy of the GNU General Public License
-// along with this program; if not, write to the Free Software
-// Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA
-// 02111-1307, USA.
-//
 // DESCRIPTION:
 //	Handles WAD file header, directory, lump I/O.
 //
-//-----------------------------------------------------------------------------
 
 
 
@@ -32,9 +24,10 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "doomdef.h"
 #include "doomtype.h"
 
+#include "config.h"
+#include "d_iwad.h"
 #include "i_swap.h"
 #include "i_system.h"
 #include "i_video.h"
@@ -71,43 +64,6 @@ unsigned int numlumps = 0;
 // Hash table for fast lookups
 
 static lumpinfo_t **lumphash;
-
-static void ExtractFileBase(char *path, char *dest)
-{
-    char *src;
-    char *filename;
-    int length;
-
-    src = path + strlen(path) - 1;
-
-    // back up until a \ or the start
-    while (src != path && *(src - 1) != DIR_SEPARATOR)
-    {
-	src--;
-    }
-
-    filename = src;
-
-    // Copy up to eight characters
-    // Note: Vanilla Doom exits with an error if a filename is specified
-    // with a base of more than eight characters.  To remove the 8.3
-    // filename limit, instead we simply truncate the name.
-
-    length = 0;
-    memset(dest, 0, 8);
-
-    while (*src != '\0' && *src != '.')
-    {
-        if (length >= 8)
-        {
-            printf("Warning: Truncated '%s' lump name to '%.8s'.\n",
-                   filename, dest);
-            break;
-        }
-
-	dest[length++] = toupper((int)*src++);
-    }
-}
 
 // Hash function used for lump names.
 
@@ -179,7 +135,7 @@ wad_file_t *W_AddFile (char *filename)
         // Name the lump after the base of the filename (without the
         // extension).
 
-	ExtractFileBase (filename, fileinfo->name);
+	M_ExtractFileBase (filename, fileinfo->name);
 	numlumps++;
     }
     else 
@@ -573,5 +529,46 @@ void W_GenerateHashTable(void)
     }
 
     // All done!
+}
+
+// Lump names that are unique to particular game types. This lets us check
+// the user is not trying to play with the wrong executable, eg.
+// chocolate-doom -iwad hexen.wad.
+static const struct
+{
+    GameMission_t mission;
+    char *lumpname;
+} unique_lumps[] = {
+    { doom,    "POSSA1" },
+    { heretic, "IMPXA1" },
+    { hexen,   "ETTNA1" },
+    { strife,  "AGRDA1" },
+};
+
+void W_CheckCorrectIWAD(GameMission_t mission)
+{
+    int i;
+    int lumpnum;
+
+    for (i = 0; i < arrlen(unique_lumps); ++i)
+    {
+        if (mission != unique_lumps[i].mission)
+        {
+            lumpnum = W_CheckNumForName(unique_lumps[i].lumpname);
+
+            if (lumpnum >= 0)
+            {
+                I_Error("\nYou are trying to use a %s IWAD file with "
+                        "the %s%s binary.\nThis isn't going to work.\n"
+                        "You probably want to use the %s%s binary.",
+                        D_SuggestGameName(unique_lumps[i].mission,
+                                          indetermined),
+                        PROGRAM_PREFIX,
+                        D_GameMissionString(mission),
+                        PROGRAM_PREFIX,
+                        D_GameMissionString(unique_lumps[i].mission));
+            }
+        }
+    }
 }
 

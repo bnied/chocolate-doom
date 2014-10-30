@@ -405,6 +405,13 @@ static void ReadLoopPoints(char *filename, file_metadata_t *metadata)
 
     // Only valid if at the very least we read the sample rate.
     metadata->valid = metadata->samplerate_hz > 0;
+
+    // If start and end time are both zero, ignore the loop tags.
+    // This is consistent with other source ports.
+    if (metadata->start_time == 0 && metadata->end_time == 0)
+    {
+        metadata->valid = false;
+    }
 }
 
 // Given a MUS lump, look up a substitute MUS file to play instead
@@ -414,6 +421,7 @@ static char *GetSubstituteMusicFile(void *data, size_t data_len)
 {
     sha1_context_t context;
     sha1_digest_t hash;
+    char *filename;
     int i;
 
     // Don't bother doing a hash if we're never going to find anything.
@@ -427,16 +435,30 @@ static char *GetSubstituteMusicFile(void *data, size_t data_len)
     SHA1_Final(hash, &context);
 
     // Look for a hash that matches.
+    // The substitute mapping list can (intentionally) contain multiple
+    // filename mappings for the same hash. This allows us to try
+    // different files and fall back if our first choice isn't found.
+
+    filename = NULL;
 
     for (i = 0; i < subst_music_len; ++i)
     {
         if (memcmp(hash, subst_music[i].hash, sizeof(hash)) == 0)
         {
-            return subst_music[i].filename;
+            filename = subst_music[i].filename;
+
+            // If the file exists, then use this file in preference to
+            // any fallbacks. But we always return a filename if it's
+            // in the list, even if it's just so we can print an error
+            // message to the user saying it doesn't exist.
+            if (M_FileExists(filename))
+            {
+                break;
+            }
         }
     }
 
-    return NULL;
+    return filename;
 }
 
 // Add a substitute music file to the lookup list.
@@ -476,14 +498,14 @@ static char *GetFullPath(char *base_filename, char *path)
     // so just return it.
     if (path[0] == DIR_SEPARATOR)
     {
-        return strdup(path);
+        return M_StringDuplicate(path);
     }
 
 #ifdef _WIN32
     // d:\path\...
     if (isalpha(path[0]) && path[1] == ':' && path[2] == DIR_SEPARATOR)
     {
-        return strdup(path);
+        return M_StringDuplicate(path);
     }
 #endif
 
@@ -494,7 +516,7 @@ static char *GetFullPath(char *base_filename, char *path)
 
     // Copy config filename and cut off the filename to just get the
     // parent dir.
-    basedir = strdup(base_filename);
+    basedir = M_StringDuplicate(base_filename);
     p = strrchr(basedir, DIR_SEPARATOR);
     if (p != NULL)
     {
@@ -503,7 +525,7 @@ static char *GetFullPath(char *base_filename, char *path)
     }
     else
     {
-        result = strdup(path);
+        result = M_StringDuplicate(path);
     }
     free(basedir);
     free(path);
@@ -650,7 +672,7 @@ static void LoadSubstituteConfigs(void)
 
     if (!strcmp(configdir, ""))
     {
-        musicdir = strdup("");
+        musicdir = M_StringDuplicate("");
     }
     else
     {
@@ -783,7 +805,7 @@ static boolean WriteWrapperTimidityConfig(char *write_path)
     p = strrchr(timidity_cfg_path, DIR_SEPARATOR);
     if (p != NULL)
     {
-        path = strdup(timidity_cfg_path);
+        path = M_StringDuplicate(timidity_cfg_path);
         path[p - timidity_cfg_path] = '\0';
         fprintf(fstream, "dir %s\n", path);
         free(path);
@@ -1232,34 +1254,26 @@ static void RestartCurrentTrack(void)
     double start = (double) file_metadata.start_time
                  / file_metadata.samplerate_hz;
 
-    // If the track is playing on loop then reset to the start point.
-    // Otherwise we need to stop the track.
-    if (current_track_loop)
+    // If the track finished we need to restart it.
+    if (current_track_music != NULL)
     {
-        // If the track finished we need to restart it.
-        if (current_track_music != NULL)
-        {
-            Mix_PlayMusic(current_track_music, 1);
-        }
+        Mix_PlayMusic(current_track_music, 1);
+    }
 
-        Mix_SetMusicPosition(start);
-        SDL_LockAudio();
-        current_track_pos = file_metadata.start_time;
-        SDL_UnlockAudio();
-    }
-    else
-    {
-        Mix_HaltMusic();
-        current_track_music = NULL;
-        playing_substitute = false;
-    }
+    Mix_SetMusicPosition(start);
+    SDL_LockAudio();
+    current_track_pos = file_metadata.start_time;
+    SDL_UnlockAudio();
 }
 
 // Poll music position; if we have passed the loop point end position
 // then we need to go back.
 static void I_SDL_PollMusic(void)
 {
-    if (playing_substitute && file_metadata.valid)
+    // When playing substitute tracks, loop tags only apply if we're playing
+    // a looping track. Tracks like the title screen music have the loop
+    // tags ignored.
+    if (current_track_loop && playing_substitute && file_metadata.valid)
     {
         double end = (double) file_metadata.end_time
                    / file_metadata.samplerate_hz;
@@ -1271,7 +1285,7 @@ static void I_SDL_PollMusic(void)
         }
 
         // Have we reached the actual end of track (not loop end)?
-        if (!Mix_PlayingMusic() && current_track_loop)
+        if (!Mix_PlayingMusic())
         {
             RestartCurrentTrack();
         }

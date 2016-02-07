@@ -380,6 +380,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\src\v_diskicon.h"
+				>
+			</File>
+			<File
 				RelativePath="..\src\v_patch.h"
 				>
 			</File>
@@ -796,6 +800,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\src\v_diskicon.c"
+				>
+			</File>
+			<File
 				RelativePath="..\src\v_video.c"
 				>
 			</File>
@@ -856,6 +864,10 @@
 				</File>
 				<File
 					RelativePath="..\src\doom\deh_ammo.c"
+					>
+				</File>
+				<File
+					RelativePath="..\src\doom\deh_bexstr.c"
 					>
 				</File>
 				<File

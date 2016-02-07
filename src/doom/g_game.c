@@ -281,7 +281,7 @@ static boolean WeaponSelectable(weapontype_t weapon)
 static int G_NextWeapon(int direction)
 {
     weapontype_t weapon;
-    int i;
+    int start_i, i;
 
     // Find index in the table.
 
@@ -302,13 +302,13 @@ static int G_NextWeapon(int direction)
         }
     }
 
-    // Switch weapon.
-
+    // Switch weapon. Don't loop forever.
+    start_i = i;
     do
     {
         i += direction;
         i = (i + arrlen(weapon_order_table)) % arrlen(weapon_order_table);
-    } while (!WeaponSelectable(weapon_order_table[i].weapon));
+    } while (i != start_i && !WeaponSelectable(weapon_order_table[i].weapon));
 
     return weapon_order_table[i].weapon_num;
 }
@@ -445,12 +445,11 @@ void G_BuildTiccmd (ticcmd_t* cmd, int maketic)
     // next_weapon variable is set to change weapons when
     // we generate a ticcmd.  Choose a new weapon.
 
-    if (next_weapon != 0)
+    if (gamestate == GS_LEVEL && next_weapon != 0)
     {
         i = G_NextWeapon(next_weapon);
         cmd->buttons |= BT_CHANGE;
         cmd->buttons |= i << BT_WEAPONSHIFT;
-        next_weapon = 0;
     }
     else
     {
@@ -468,6 +467,8 @@ void G_BuildTiccmd (ticcmd_t* cmd, int maketic)
             }
         }
     }
+
+    next_weapon = 0;
 
     // mouse
     if (mousebuttons[mousebforward]) 
@@ -610,6 +611,31 @@ void G_DoLoadLevel (void)
     //  setting one.
 
     skyflatnum = R_FlatNumForName(DEH_String(SKYFLATNAME));
+
+    // The "Sky never changes in Doom II" bug was fixed in
+    // the id Anthology version of doom2.exe for Final Doom.
+    if ((gamemode == commercial)
+     && (gameversion == exe_final2 || gameversion == exe_chex))
+    {
+        char *skytexturename;
+
+        if (gamemap < 12)
+        {
+            skytexturename = "SKY1";
+        }
+        else if (gamemap < 21)
+        {
+            skytexturename = "SKY2";
+        }
+        else
+        {
+            skytexturename = "SKY3";
+        }
+
+        skytexturename = DEH_String(skytexturename);
+
+        skytexture = R_TextureNumForName(skytexturename);
+    }
 
     levelstarttic = gametic;        // for time calculation
     
@@ -1143,26 +1169,26 @@ G_CheckSpot
         fixed_t xa, ya;
         signed int an;
 
-        an = (ANG45 * ((signed int) mthing->angle / 45));
-        // Right-shifting a negative signed integer is implementation-defined,
-        // so divide instead.
-        an /= 1 << ANGLETOFINESHIFT;
+        // This calculation overflows in Vanilla Doom, but here we deliberately
+        // avoid integer overflow as it is undefined behavior, so the value of
+        // 'an' will always be positive.
+        an = (ANG45 >> ANGLETOFINESHIFT) * ((signed int) mthing->angle / 45);
 
         switch (an)
         {
-            case -4096:
+            case 4096:  // -4096:
                 xa = finetangent[2048];    // finecosine[-4096]
                 ya = finetangent[0];       // finesine[-4096]
                 break;
-            case -3072:
+            case 5120:  // -3072:
                 xa = finetangent[3072];    // finecosine[-3072]
                 ya = finetangent[1024];    // finesine[-3072]
                 break;
-            case -2048:
+            case 6144:  // -2048:
                 xa = finesine[0];          // finecosine[-2048]
                 ya = finetangent[2048];    // finesine[-2048]
                 break;
-            case -1024:
+            case 7168:  // -1024:
                 xa = finesine[1024];       // finecosine[-1024]
                 ya = finetangent[3072];    // finesine[-1024]
                 break;
@@ -1170,7 +1196,6 @@ G_CheckSpot
             case 1024:
             case 2048:
             case 3072:
-            case 4096:
                 xa = finecosine[an];
                 ya = finesine[an];
                 break;
@@ -1586,59 +1611,78 @@ void G_DoSaveGame (void)
 { 
     char *savegame_file;
     char *temp_savegame_file;
+    char *recovery_savegame_file;
 
+    recovery_savegame_file = NULL;
     temp_savegame_file = P_TempSaveGameFile();
     savegame_file = P_SaveGameFile(savegameslot);
 
     // Open the savegame file for writing.  We write to a temporary file
     // and then rename it at the end if it was successfully written.
-    // This prevents an existing savegame from being overwritten by 
+    // This prevents an existing savegame from being overwritten by
     // a corrupted one, or if a savegame buffer overrun occurs.
-
     save_stream = fopen(temp_savegame_file, "wb");
 
     if (save_stream == NULL)
     {
-        return;
+        // Failed to save the game, so we're going to have to abort. But
+        // to be nice, save to somewhere else before we call I_Error().
+        recovery_savegame_file = M_TempFile("recovery.dsg");
+        save_stream = fopen(recovery_savegame_file, "wb");
+        if (save_stream == NULL)
+        {
+            I_Error("Failed to open either '%s' or '%s' to write savegame.",
+                    temp_savegame_file, recovery_savegame_file);
+        }
     }
 
     savegame_error = false;
 
     P_WriteSaveGameHeader(savedescription);
- 
-    P_ArchivePlayers (); 
-    P_ArchiveWorld (); 
-    P_ArchiveThinkers (); 
-    P_ArchiveSpecials (); 
-	 
+
+    P_ArchivePlayers ();
+    P_ArchiveWorld ();
+    P_ArchiveThinkers ();
+    P_ArchiveSpecials ();
+
     P_WriteSaveGameEOF();
-	 
-    // Enforce the same savegame size limit as in Vanilla Doom, 
+
+    // Enforce the same savegame size limit as in Vanilla Doom,
     // except if the vanilla_savegame_limit setting is turned off.
 
     if (vanilla_savegame_limit && ftell(save_stream) > SAVEGAMESIZE)
     {
-        I_Error ("Savegame buffer overrun");
+        I_Error("Savegame buffer overrun");
     }
-    
+
     // Finish up, close the savegame file.
 
     fclose(save_stream);
+
+    if (recovery_savegame_file != NULL)
+    {
+        // We failed to save to the normal location, but we wrote a
+        // recovery file to the temp directory. Now we can bomb out
+        // with an error.
+        I_Error("Failed to open savegame file '%s' for writing.\n"
+                "But your game has been saved to '%s' for recovery.",
+                temp_savegame_file, recovery_savegame_file);
+    }
 
     // Now rename the temporary savegame file to the actual savegame
     // file, overwriting the old savegame if there was one there.
 
     remove(savegame_file);
     rename(temp_savegame_file, savegame_file);
-    
-    gameaction = ga_nothing; 
+
+    gameaction = ga_nothing;
     M_StringCopy(savedescription, "", sizeof(savedescription));
 
     players[consoleplayer].message = DEH_String(GGSAVED);
 
     // draw the pattern into the back screen
-    R_FillBackScreen ();	
-} 
+    R_FillBackScreen ();
+}
  
 
 //
@@ -1701,9 +1745,6 @@ G_InitNew
     // the -warp command line parameter to behave differently.
     // This is left here for posterity.
 
-    if (skill > sk_nightmare)
-	skill = sk_nightmare;
-
     // This was quite messy with SPECIAL and commented parts.
     // Supposedly hacks to make the latest edition work.
     // It might not work properly.
@@ -1726,6 +1767,33 @@ G_InitNew
 	episode = 3;
     }
     */
+
+    if (skill > sk_nightmare)
+	skill = sk_nightmare;
+
+    if (gameversion >= exe_ultimate)
+    {
+        if (episode == 0)
+        {
+            episode = 4;
+        }
+    }
+    else
+    {
+        if (episode < 1)
+        {
+            episode = 1;
+        }
+        if (episode > 3)
+        {
+            episode = 3;
+        }
+    }
+
+    if (episode > 1 && gamemode == shareware)
+    {
+        episode = 1;
+    }
 
     if (map < 1)
 	map = 1;

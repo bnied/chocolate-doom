@@ -357,7 +357,7 @@ boolean PIT_CheckThing (mobj_t* thing)
     // check for special pickup
     if (thing->flags & MF_SPECIAL)
     {
-	solid = thing->flags&MF_SOLID;
+	solid = (thing->flags & MF_SOLID) != 0;
 	if (tmflags&MF_PICKUP)
 	{
 	    // can remove thing
@@ -1083,8 +1083,8 @@ P_AimLineAttack
     shootz = t1->z + (t1->height>>1) + 8*FRACUNIT;
 
     // can't shoot outside view angles
-    topslope = 100*FRACUNIT/160;	
-    bottomslope = -100*FRACUNIT/160;
+    topslope = (SCREENHEIGHT/2)*FRACUNIT/(SCREENWIDTH/2);	
+    bottomslope = -(SCREENHEIGHT/2)*FRACUNIT/(SCREENWIDTH/2);
     
     attackrange = distance;
     linetarget = NULL;

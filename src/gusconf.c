@@ -39,7 +39,7 @@ typedef struct
 } gus_config_t;
 
 char *gus_patch_path = "";
-unsigned int gus_ram_kb = 1024;
+int gus_ram_kb = 1024;
 
 static unsigned int MappingIndex(void)
 {
@@ -192,6 +192,7 @@ static char *ReadDMXConfig(void)
     data = Z_Malloc(len + 1, PU_STATIC, NULL);
     W_ReadLump(lumpnum, data);
 
+    data[len] = '\0';
     return data;
 }
 

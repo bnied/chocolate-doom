@@ -63,6 +63,8 @@ static char *CalibrationLabel(txt_joystick_axis_t *joystick_axis)
                        "right, and press the button.";
             }
     }
+
+    return NULL;
 }
 
 static void SetCalibrationLabel(txt_joystick_axis_t *joystick_axis)
@@ -265,6 +267,8 @@ static int NextCalibrateStage(txt_joystick_axis_t *joystick_axis)
         case CONFIG_STAGE2:
             return CONFIG_CENTER;
     }
+
+    return -1;
 }
 
 static int EventCallback(SDL_Event *event, TXT_UNCAST_ARG(joystick_axis))
@@ -363,7 +367,7 @@ void TXT_ConfigureJoystickAxis(txt_joystick_axis_t *joystick_axis,
     joystick_axis->joystick = SDL_JoystickOpen(joystick_index);
     if (joystick_axis->joystick == NULL)
     {
-        // TODO: OpenErrorWindow();
+        TXT_MessageBox(NULL, "Please configure a controller first!");
         return;
     }
 
@@ -457,7 +461,7 @@ static void TXT_JoystickAxisDrawer(TXT_UNCAST_ARG(joystick_axis))
 
     TXT_DrawString(buf);
 
-    for (i=strlen(buf); i<JOYSTICK_AXIS_WIDTH; ++i)
+    for (i = strlen(buf); i < joystick_axis->widget.w; ++i)
     {
         TXT_DrawString(" ");
     }

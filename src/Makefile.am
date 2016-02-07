@@ -18,9 +18,9 @@ SETUP_BINARIES = @PROGRAM_PREFIX@doom-setup$(EXEEXT)    \
 
 execgames_SCRIPTS = $(SETUP_BINARIES)
 
-AM_CFLAGS = -I$(top_builddir)/textscreen            \
-            -I$(top_builddir)/opl                   \
-            -I$(top_builddir)/pcsound               \
+AM_CFLAGS = -I$(top_srcdir)/textscreen            \
+            -I$(top_srcdir)/opl                   \
+            -I$(top_srcdir)/pcsound               \
             @SDLMIXER_CFLAGS@ @SDLNET_CFLAGS@
 
 # Common source files used by absolutely everything:
@@ -79,6 +79,7 @@ m_fixed.c            m_fixed.h             \
 sha1.c               sha1.h                \
 memio.c              memio.h               \
 tables.c             tables.h              \
+v_diskicon.c         v_diskicon.h          \
 v_video.c            v_video.h             \
                      v_patch.h             \
 w_checksum.c         w_checksum.h          \
@@ -185,7 +186,7 @@ endif
 @PROGRAM_PREFIX@strife_LDADD = strife/libstrife.a $(EXTRA_LIBS)
 
 $(SETUP_BINARIES): @PROGRAM_PREFIX@setup$(EXEEXT)
-	cp $< $@
+	cp @PROGRAM_PREFIX@setup$(EXEEXT) $@
 
 # Source files needed for chocolate-setup:
 
@@ -216,6 +217,25 @@ EXTRA_DIST =                        \
         icon.c                      \
         doom-screensaver.desktop.in \
         manifest.xml
+
+appdatadir = $(prefix)/share/appdata
+appdata_DATA =                              \
+        @PROGRAM_PREFIX@doom.appdata.xml    \
+        @PROGRAM_PREFIX@heretic.appdata.xml \
+        @PROGRAM_PREFIX@hexen.appdata.xml   \
+        @PROGRAM_PREFIX@strife.appdata.xml
+
+@PROGRAM_PREFIX@doom.appdata.xml : doom.appdata.xml
+	cp doom.appdata.xml $@
+
+@PROGRAM_PREFIX@heretic.appdata.xml : heretic.appdata.xml
+	cp heretic.appdata.xml $@
+
+@PROGRAM_PREFIX@hexen.appdata.xml : hexen.appdata.xml
+	cp hexen.appdata.xml $@
+
+@PROGRAM_PREFIX@strife.appdata.xml : strife.appdata.xml
+	cp strife.appdata.xml $@
 
 appdir = $(prefix)/share/applications
 app_DATA =                                 \
@@ -252,13 +272,14 @@ CLEANFILES = $(execgames_SCRIPTS) $(app_DATA) $(screensaver_DATA)
 if HAVE_PYTHON
 
 icon.c : $(top_builddir)/data/doom8.ico
-	$(top_builddir)/data/convert-icon $< $@
+	$(top_builddir)/data/convert-icon $(top_builddir)/data/doom8.ico $@
 
 endif
 
 midiread : midifile.c
-	$(CC) -DTEST $(CFLAGS) @LDFLAGS@ $< -o $@
+	$(CC) -DTEST $(CFLAGS) @LDFLAGS@ midifile.c -o $@
 
-mus2mid : mus2mid.c memio.c z_native.c i_system.c m_argv.c m_misc.c
-	$(CC) -DSTANDALONE -I$(top_builddir) $(CFLAGS) @LDFLAGS@ $^ -o $@
+MUS2MID_SOURCES = mus2mid.c memio.c z_native.c i_system.c m_argv.c m_misc.c
+mus2mid : $(MUS2MID_SOURCES)
+	$(CC) -DSTANDALONE -I$(top_builddir) $(CFLAGS) @LDFLAGS@ $(MUS2MID_SOURCES) -o $@
 

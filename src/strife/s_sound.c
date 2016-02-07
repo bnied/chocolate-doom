@@ -60,7 +60,6 @@
 
 #define S_STEREO_SWING (96 * FRACUNIT)
 
-#define NORM_PITCH 128
 #define NORM_PRIORITY 64
 #define NORM_SEP 128
 
@@ -74,6 +73,8 @@ typedef struct
 
     // handle of the sound being played
     int handle;
+
+    int pitch;
     
 } channel_t;
 
@@ -137,6 +138,7 @@ void S_Init(int sfxVolume, int musicVolume, int voiceVolume)
 {  
     int i;
 
+    I_SetOPLDriverVer(opl_doom_1_9);
     I_PrecacheSounds(S_sfx, NUMSFX);
 
     S_SetSfxVolume(sfxVolume);
@@ -277,7 +279,7 @@ static int S_GetChannel(mobj_t *origin, sfxinfo_t *sfxinfo, boolean isvoice)
     channel_t*        c;
 
     // Find an open channel
-     for (cnum=0 ; cnum<snd_channels ; cnum++)
+    for (cnum=0 ; cnum<snd_channels ; cnum++)
     {
         if (!channels[cnum].sfxinfo)
         {
@@ -286,6 +288,11 @@ static int S_GetChannel(mobj_t *origin, sfxinfo_t *sfxinfo, boolean isvoice)
         else if (origin && channels[cnum].origin == origin &&
                  (isvoice || cnum != i_voicehandle)) // haleyjd
         {
+            // haleyjd 20150220: [STRIFE] missing sound channel priority check
+            // Is a higher priority sound by same origin already playing?
+            if(!isvoice && sfxinfo->priority > channels[cnum].sfxinfo->priority)
+                return -1;
+
             S_StopChannel(cnum);
             break;
         }
@@ -402,6 +409,7 @@ void S_StartSound(void *origin_p, int sfx_id)
     mobj_t *origin;
     int rc;
     int sep;
+    int pitch;
     int cnum;
     int volume;
 
@@ -448,7 +456,7 @@ void S_StartSound(void *origin_p, int sfx_id)
 
         if (origin->x == players[consoleplayer].mo->x
          && origin->y == players[consoleplayer].mo->y)
-        {        
+        {
             sep = NORM_SEP;
         }
 
@@ -456,11 +464,12 @@ void S_StartSound(void *origin_p, int sfx_id)
         {
             return;
         }
-    }        
+    }
     else
     {
         sep = NORM_SEP;
     }
+    pitch = NORM_PITCH;
 
     // kill old sound [STRIFE] - nope!
     //S_StopSound(origin);
@@ -484,7 +493,7 @@ void S_StartSound(void *origin_p, int sfx_id)
         sfx->lumpnum = I_GetSfxLumpNum(sfx);
     }
 
-    channels[cnum].handle = I_StartSound(sfx, cnum, volume, sep);
+    channels[cnum].handle = I_StartSound(sfx, cnum, volume, sep, pitch);
 }
 
 
@@ -609,9 +618,9 @@ void I_StartVoice(const char *lumpname)
 
         // get a channel for the voice
         i_voicehandle = S_GetChannel(NULL, &voice->sfx, true);
-        
+
         channels[i_voicehandle].handle 
-            = I_StartSound(&voice->sfx, i_voicehandle, snd_VoiceVolume, NORM_SEP);
+            = I_StartSound(&voice->sfx, i_voicehandle, snd_VoiceVolume, NORM_SEP, NORM_PITCH);
     }
 }
 
@@ -687,7 +696,7 @@ void S_UpdateSounds(mobj_t *listener)
                                                   c->origin,
                                                   &volume,
                                                   &sep);
-                    
+
                     if (!audible)
                     {
                         S_StopChannel(cnum);

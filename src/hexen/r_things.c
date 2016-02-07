@@ -178,15 +178,15 @@ void R_InitSpriteDefs(char **namelist)
         // scan the lumps, filling in the frames for whatever is found
         //
         for (l = start + 1; l < end; l++)
-            if (!strncmp(lumpinfo[l].name, namelist[i], 4))
+            if (!strncmp(lumpinfo[l]->name, namelist[i], 4))
             {
-                frame = lumpinfo[l].name[4] - 'A';
-                rotation = lumpinfo[l].name[5] - '0';
+                frame = lumpinfo[l]->name[4] - 'A';
+                rotation = lumpinfo[l]->name[5] - '0';
                 R_InstallSpriteLump(l, frame, rotation, false);
-                if (lumpinfo[l].name[6])
+                if (lumpinfo[l]->name[6])
                 {
-                    frame = lumpinfo[l].name[6] - 'A';
-                    rotation = lumpinfo[l].name[7] - '0';
+                    frame = lumpinfo[l]->name[6] - 'A';
+                    rotation = lumpinfo[l]->name[7] - '0';
                     R_InstallSpriteLump(l, frame, rotation, true);
                 }
             }
@@ -388,7 +388,7 @@ void R_DrawVisSprite(vissprite_t * vis, int x1, int x2)
         {
             colfunc = R_DrawTranslatedTLColumn;
             dc_translation = translationtables - 256
-                + vis->class * ((MAXPLAYERS - 1) * 256) +
+                + vis->class * ((maxplayers - 1) * 256) +
                 ((vis->mobjflags & MF_TRANSLATION) >> (MF_TRANSSHIFT - 8));
         }
         else if (vis->mobjflags & MF_SHADOW)
@@ -405,7 +405,7 @@ void R_DrawVisSprite(vissprite_t * vis, int x1, int x2)
         // Draw using translated column function
         colfunc = R_DrawTranslatedColumn;
         dc_translation = translationtables - 256
-            + vis->class * ((MAXPLAYERS - 1) * 256) +
+            + vis->class * ((maxplayers - 1) * 256) +
             ((vis->mobjflags & MF_TRANSLATION) >> (MF_TRANSSHIFT - 8));
     }
 
@@ -426,7 +426,7 @@ void R_DrawVisSprite(vissprite_t * vis, int x1, int x2)
 
     if (vis->floorclip && !vis->psprite)
     {
-        sprbotscreen = sprtopscreen + FixedMul(patch->height << FRACBITS,
+        sprbotscreen = sprtopscreen + FixedMul(SHORT(patch->height) << FRACBITS,
                                                spryscale);
         baseclip = (sprbotscreen - FixedMul(vis->floorclip,
                                             spryscale)) >> FRACBITS;

@@ -62,7 +62,6 @@ boolean respawnparm;            // checkparm of -respawn
 boolean debugmode;              // checkparm of -debug
 boolean ravpic;                 // checkparm of -ravpic
 boolean cdrom;                  // true if cd-rom mode active
-boolean singletics;             // debug flag to cancel adaptiveness
 boolean noartiskip;             // whether shift-enter skips an artifact
 
 skill_t startskill;
@@ -756,20 +755,20 @@ void D_BindVariables(void)
     M_BindMenuControls();
     M_BindMapControls();
 
-    M_BindVariable("mouse_sensitivity",      &mouseSensitivity);
-    M_BindVariable("sfx_volume",             &snd_MaxVolume);
-    M_BindVariable("music_volume",           &snd_MusicVolume);
-    M_BindVariable("screenblocks",           &screenblocks);
-    M_BindVariable("snd_channels",           &snd_Channels);
-    M_BindVariable("show_endoom",            &show_endoom);
-    M_BindVariable("graphical_startup",      &graphical_startup);
+    M_BindIntVariable("mouse_sensitivity",      &mouseSensitivity);
+    M_BindIntVariable("sfx_volume",             &snd_MaxVolume);
+    M_BindIntVariable("music_volume",           &snd_MusicVolume);
+    M_BindIntVariable("screenblocks",           &screenblocks);
+    M_BindIntVariable("snd_channels",           &snd_Channels);
+    M_BindIntVariable("show_endoom",            &show_endoom);
+    M_BindIntVariable("graphical_startup",      &graphical_startup);
 
     for (i=0; i<10; ++i)
     {
         char buf[12];
 
         M_snprintf(buf, sizeof(buf), "chatmacro%i", i);
-        M_BindVariable(buf, &chat_macros[i]);
+        M_BindStringVariable(buf, &chat_macros[i]);
     }
 }
 
@@ -1001,9 +1000,12 @@ void D_DoomMain(void)
 
     if (p)
     {
+        char *uc_filename = strdup(myargv[p + 1]);
+        M_ForceUppercase(uc_filename);
+
         // In Vanilla, the filename must be specified without .lmp,
         // but make that optional.
-        if (M_StringEndsWith(myargv[p + 1], ".lmp"))
+        if (M_StringEndsWith(uc_filename, ".LMP"))
         {
             M_StringCopy(file, myargv[p + 1], sizeof(file));
         }
@@ -1012,9 +1014,11 @@ void D_DoomMain(void)
             DEH_snprintf(file, sizeof(file), "%s.lmp", myargv[p + 1]);
         }
 
+        free(uc_filename);
+
         if (D_AddFile(file))
         {
-            M_StringCopy(demolumpname, lumpinfo[numlumps - 1].name,
+            M_StringCopy(demolumpname, lumpinfo[numlumps - 1]->name,
                          sizeof(demolumpname));
         }
         else

@@ -40,6 +40,7 @@
 #include "w_main.h"
 #include "w_wad.h"
 #include "s_sound.h"
+#include "v_diskicon.h"
 #include "v_video.h"
 
 #include "f_finale.h"
@@ -216,12 +217,12 @@ void D_Display (void)
 	    break;
 	if (automapactive)
 	    AM_Drawer ();
-	if (wipe || (viewheight != 200 && fullscreen) )
+	if (wipe || (viewheight != SCREENHEIGHT && fullscreen) || disk_indicator == disk_dirty)
 	    redrawsbar = true;
 	if (inhelpscreensstate && !inhelpscreens)
 	    redrawsbar = true;              // just put away the help screen
-	ST_Drawer (viewheight == 200, redrawsbar );
-	fullscreen = viewheight == 200;
+	ST_Drawer (viewheight == SCREENHEIGHT, redrawsbar );
+	fullscreen = viewheight == SCREENHEIGHT;
 	break;
 
       case GS_INTERMISSION:
@@ -259,7 +260,7 @@ void D_Display (void)
     }
 
     // see if the border needs to be updated to the screen
-    if (gamestate == GS_LEVEL && !automapactive && scaledviewwidth != 320)
+    if (gamestate == GS_LEVEL && !automapactive && scaledviewwidth != SCREENWIDTH)
     {
 	if (menuactive || menuactivestate || !viewactivestate)
 	    borderdrawcount = 3;
@@ -359,16 +360,17 @@ void D_BindVariables(void)
     NET_BindVariables();
 #endif
 
-    M_BindVariable("mouse_sensitivity",      &mouseSensitivity);
-    M_BindVariable("sfx_volume",             &sfxVolume);
-    M_BindVariable("music_volume",           &musicVolume);
-    M_BindVariable("show_messages",          &showMessages);
-    M_BindVariable("screenblocks",           &screenblocks);
-    M_BindVariable("detaillevel",            &detailLevel);
-    M_BindVariable("snd_channels",           &snd_channels);
-    M_BindVariable("vanilla_savegame_limit", &vanilla_savegame_limit);
-    M_BindVariable("vanilla_demo_limit",     &vanilla_demo_limit);
-    M_BindVariable("show_endoom",            &show_endoom);
+    M_BindIntVariable("mouse_sensitivity",      &mouseSensitivity);
+    M_BindIntVariable("sfx_volume",             &sfxVolume);
+    M_BindIntVariable("music_volume",           &musicVolume);
+    M_BindIntVariable("show_messages",          &showMessages);
+    M_BindIntVariable("screenblocks",           &screenblocks);
+    M_BindIntVariable("detaillevel",            &detailLevel);
+    M_BindIntVariable("snd_channels",           &snd_channels);
+    M_BindIntVariable("vanilla_savegame_limit", &vanilla_savegame_limit);
+    M_BindIntVariable("vanilla_demo_limit",     &vanilla_demo_limit);
+    M_BindIntVariable("show_endoom",            &show_endoom);
+    M_BindIntVariable("show_diskicon",          &show_diskicon);
 
     // Multiplayer chat macros
 
@@ -377,7 +379,7 @@ void D_BindVariables(void)
         char buf[12];
 
         M_snprintf(buf, sizeof(buf), "chatmacro%i", i);
-        M_BindVariable(buf, &chat_macros[i]);
+        M_BindStringVariable(buf, &chat_macros[i]);
     }
 }
 
@@ -429,7 +431,7 @@ void D_DoomLoop (void)
     I_GraphicsCheckCommandLine();
     I_SetGrabMouseCallback(D_GrabMouseCallback);
     I_InitGraphics();
-    I_EnableLoadingDisk();
+    V_EnableLoadingDisk(SCREENWIDTH - LOADING_DISK_W, SCREENHEIGHT - LOADING_DISK_H);
 
     V_RestoreBuffer();
     R_ExecuteSetViewSize();
@@ -607,6 +609,10 @@ static char *banners[] =
     "                         "
     "DOOM 2: Hell on Earth v%i.%i"
     "                           ",
+    // doom2.wad v1.666
+    "                         "
+    "DOOM 2: Hell on Earth v%i.%i66"
+    "                          ",
     // doom1.wad
     "                            "
     "DOOM Shareware Startup v%i.%i"
@@ -619,6 +625,10 @@ static char *banners[] =
     "                          "
     "DOOM System Startup v%i.%i"
     "                          ",
+    // Doom v1.666
+    "                          "
+    "DOOM System Startup v%i.%i66"
+    "                          "
     // doom.wad (Ultimate DOOM)
     "                         "
     "The Ultimate DOOM Startup v%i.%i"
@@ -731,12 +741,12 @@ void D_IdentifyVersion(void)
 
         for (i=0; i<numlumps; ++i)
         {
-            if (!strncasecmp(lumpinfo[i].name, "MAP01", 8))
+            if (!strncasecmp(lumpinfo[i]->name, "MAP01", 8))
             {
                 gamemission = doom2;
                 break;
             } 
-            else if (!strncasecmp(lumpinfo[i].name, "E1M1", 8))
+            else if (!strncasecmp(lumpinfo[i]->name, "E1M1", 8))
             {
                 gamemission = doom;
                 break;
@@ -945,15 +955,20 @@ static struct
 
 static void InitGameVersion(void)
 {
+    byte *demolump;
+    char demolumpname[6];
+    int demoversion;
     int p;
     int i;
+    boolean status;
 
     //! 
     // @arg <version>
     // @category compat
     //
-    // Emulate a specific version of Doom.  Valid values are "1.9",
-    // "ultimate", "final", "final2", "hacx" and "chex".
+    // Emulate a specific version of Doom.  Valid values are "1.666",
+    // "1.7", "1.8", "1.9", "ultimate", "final", "final2", "hacx" and
+    // "chex".
     //
 
     p = M_CheckParmWithArgs("-gameversion", 1);
@@ -998,13 +1013,46 @@ static void InitGameVersion(void)
 
             gameversion = exe_hacx;
         }
-        else if (gamemode == shareware || gamemode == registered)
+        else if (gamemode == shareware || gamemode == registered
+              || (gamemode == commercial && gamemission == doom2))
         {
             // original
-
             gameversion = exe_doom_1_9;
 
-            // TODO: Detect IWADs earlier than Doom v1.9.
+            // Detect version from demo lump
+            for (i = 1; i <= 3; ++i)
+            {
+                M_snprintf(demolumpname, 6, "demo%i", i);
+                if (W_CheckNumForName(demolumpname) > 0)
+                {
+                    demolump = W_CacheLumpName(demolumpname, PU_STATIC);
+                    demoversion = demolump[0];
+                    W_ReleaseLumpName(demolumpname);
+                    status = true;
+                    switch (demoversion)
+                    {
+                        case 106:
+                            gameversion = exe_doom_1_666;
+                            break;
+                        case 107:
+                            gameversion = exe_doom_1_7;
+                            break;
+                        case 108:
+                            gameversion = exe_doom_1_8;
+                            break;
+                        case 109:
+                            gameversion = exe_doom_1_9;
+                            break;
+                        default:
+                            status = false;
+                            break;
+                    }
+                    if (status)
+                    {
+                        break;
+                    }
+                }
+            }
         }
         else if (gamemode == retail)
         {
@@ -1012,20 +1060,13 @@ static void InitGameVersion(void)
         }
         else if (gamemode == commercial)
         {
-            if (gamemission == doom2)
-            {
-                gameversion = exe_doom_1_9;
-            }
-            else
-            {
-                // Final Doom: tnt or plutonia
-                // Defaults to emulating the first Final Doom executable,
-                // which has the crash in the demo loop; however, having
-                // this as the default should mean that it plays back
-                // most demos correctly.
+            // Final Doom: tnt or plutonia
+            // Defaults to emulating the first Final Doom executable,
+            // which has the crash in the demo loop; however, having
+            // this as the default should mean that it plays back
+            // most demos correctly.
 
-                gameversion = exe_final;
-            }
+            gameversion = exe_final;
         }
     }
     
@@ -1149,6 +1190,11 @@ static void LoadIwadDeh(void)
             I_Error("Failed to load chex.deh needed for emulating chex.exe.");
         }
     }
+}
+
+static void G_CheckDemoStatusAtExit (void)
+{
+    G_CheckDemoStatus();
 }
 
 //
@@ -1470,9 +1516,12 @@ void D_DoomMain (void)
 
     if (p)
     {
+        char *uc_filename = strdup(myargv[p + 1]);
+        M_ForceUppercase(uc_filename);
+
         // With Vanilla you have to specify the file without extension,
         // but make that optional.
-        if (M_StringEndsWith(myargv[p + 1], ".lmp"))
+        if (M_StringEndsWith(uc_filename, ".LMP"))
         {
             M_StringCopy(file, myargv[p + 1], sizeof(file));
         }
@@ -1481,9 +1530,11 @@ void D_DoomMain (void)
             DEH_snprintf(file, sizeof(file), "%s.lmp", myargv[p+1]);
         }
 
+        free(uc_filename);
+
         if (D_AddFile(file))
         {
-            M_StringCopy(demolumpname, lumpinfo[numlumps - 1].name,
+            M_StringCopy(demolumpname, lumpinfo[numlumps - 1]->name,
                          sizeof(demolumpname));
         }
         else
@@ -1498,7 +1549,7 @@ void D_DoomMain (void)
         printf("Playing demo %s.\n", file);
     }
 
-    I_AtExit((atexit_func_t) G_CheckDemoStatus, true);
+    I_AtExit(G_CheckDemoStatusAtExit, true);
 
     // Generate the WAD hash table.  Speed things up a bit.
     W_GenerateHashTable();
@@ -1518,7 +1569,7 @@ void D_DoomMain (void)
 
         for (i = numiwadlumps; i < numlumps; ++i)
         {
-            if (!strncmp(lumpinfo[i].name, "DEHACKED", 8))
+            if (!strncmp(lumpinfo[i]->name, "DEHACKED", 8))
             {
                 DEH_LoadLump(i, false, false);
                 loaded++;

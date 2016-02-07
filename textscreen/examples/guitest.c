@@ -96,19 +96,21 @@ void SetupWindow(void)
     
     window = TXT_NewWindow("Window test");
 
+    TXT_SetWindowHelpURL(window, "https://www.youtube.com/watch?v=dQw4w9WgXcQ");
+
     TXT_AddWidget(window, TXT_NewSeparator("Main section"));
     table = TXT_NewTable(3);
 
     toplabel = TXT_NewLabel("This is a multiline label.\n"
                             "A single label object contains \n"
-                            "all three of these lines.\n");
+                            "all three of these lines.");
     TXT_AddWidget(window, toplabel);
     TXT_SetWidgetAlign(toplabel, TXT_HORIZ_CENTER);
 
     //TXT_AddWidget(window, TXT_NewScrollPane(15, 4, table));
     TXT_AddWidget(window, table);
 
-    for (i=0; i<5; ++i)
+    for (i=0; i<3; ++i)
     {
         TXT_snprintf(buf, sizeof(buf), "Option %i in a table:", i + 1);
         TXT_AddWidget(table, TXT_NewLabel(buf));
@@ -117,6 +119,17 @@ void SetupWindow(void)
         TXT_snprintf(buf, sizeof(buf), " Button %i-2 ", i + 1);
         TXT_AddWidget(table, TXT_NewButton(buf));
     }
+
+    TXT_AddWidgets(table,
+                   TXT_NewLabel("Still the same table, but:\n"
+                                "This label magically overflows\n"
+                                "across multiple cells! Cool, huh? "),
+                   TXT_TABLE_OVERFLOW_RIGHT,
+                   TXT_NewButton("Do nothing"),
+                   TXT_TABLE_OVERFLOW_DOWN,
+                   TXT_TABLE_OVERFLOW_DOWN,
+                   TXT_NewButton("Also nothing"),
+                   NULL);
 
     TXT_AddWidget(window, TXT_NewStrut(0, 1));
     value_label = TXT_NewLabel("");

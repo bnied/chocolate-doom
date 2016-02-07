@@ -21,6 +21,10 @@
 #ifndef __DOOMTYPE__
 #define __DOOMTYPE__
 
+#if defined(_MSC_VER) && !defined(__cplusplus)
+#define inline __inline
+#endif
+
 // #define macros to provide functions missing in Windows.
 // Outside Windows, we use strings.h for str[n]casecmp.
 
@@ -47,7 +51,13 @@
 //
 
 #ifdef __GNUC__
+
+#if defined(_WIN32) && !defined(__clang__)
+#define PACKEDATTR __attribute__((packed,gcc_struct))
+#else
 #define PACKEDATTR __attribute__((packed))
+#endif
+
 #else
 #define PACKEDATTR
 #endif
@@ -62,7 +72,7 @@
 
 #include <inttypes.h>
 
-#ifdef __cplusplus
+#if defined(__cplusplus) || defined(__bool_true_false_are_defined)
 
 // Use builtin bool type with C++.
 

@@ -38,6 +38,8 @@
 #include "multiplayer.h"
 #include "sound.h"
 
+#define WINDOW_HELP_URL "http://www.chocolate-doom.org/setup"
+
 static const int cheat_sequence[] =
 {
     KEY_UPARROW, KEY_UPARROW, KEY_DOWNARROW, KEY_DOWNARROW,
@@ -89,6 +91,8 @@ static void SensibleDefaults(void)
     show_endoom = 0;
     dclick_use = 0;
     novert = 1;
+    snd_dmxoption = "-opl3 -reverse";
+    png_screenshots = 1;
 }
 
 static int MainMenuKeyPress(txt_window_t *window, int key, void *user_data)
@@ -209,6 +213,8 @@ void MainMenu(void)
 
     window = TXT_NewWindow("Main Menu");
 
+    TXT_SetWindowHelpURL(window, WINDOW_HELP_URL);
+
     TXT_AddWidgets(window,
           TXT_NewButton2("Configure Display",
                          (TxtWidgetSignalFunc) ConfigDisplay, NULL),
@@ -247,7 +253,7 @@ void MainMenu(void)
           NULL);
 
     quit_action = TXT_NewWindowAction(KEY_ESCAPE, "Quit");
-    warp_action = TXT_NewWindowAction(KEY_F1, "Warp");
+    warp_action = TXT_NewWindowAction(KEY_F2, "Warp");
     TXT_SignalConnect(quit_action, "pressed", QuitConfirm, NULL);
     TXT_SignalConnect(warp_action, "pressed",
                       (TxtWidgetSignalFunc) WarpMenu, NULL);

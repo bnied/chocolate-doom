@@ -528,7 +528,8 @@ ST_Responder (event_t* ev)
 	{
 	  musnum = mus_runnin + (buf[0]-'0')*10 + buf[1]-'0' - 1;
 	  
-	  if (((buf[0]-'0')*10 + buf[1]-'0') > 35)
+	  if (((buf[0]-'0')*10 + buf[1]-'0') > 35
+       && gameversion >= exe_doom_1_8)
 	    plyr->message = DEH_String(STSTR_NOMUS);
 	  else
 	    S_ChangeMusic(musnum, 1);
@@ -610,47 +611,64 @@ ST_Responder (event_t* ev)
       
       if (gamemode == commercial)
       {
-	epsd = 1;
+	epsd = 0;
 	map = (buf[0] - '0')*10 + buf[1] - '0';
       }
       else
       {
 	epsd = buf[0] - '0';
 	map = buf[1] - '0';
-      }
 
-      // Chex.exe always warps to episode 1.
+        // Chex.exe always warps to episode 1.
 
-      if (gameversion == exe_chex)
-      {
-        epsd = 1;
+        if (gameversion == exe_chex)
+        {
+            if (epsd > 1)
+            {
+                epsd = 1;
+            }
+            if (map > 5)
+            {
+                map = 5;
+            }
+        }
       }
 
       // Catch invalid maps.
-      if (epsd < 1)
-	return false;
-
-      if (map < 1)
-	return false;
-
-      // Ohmygod - this is not going to work.
-      if ((gamemode == retail)
-	  && ((epsd > 4) || (map > 9)))
-	return false;
-
-      if ((gamemode == registered)
-	  && ((epsd > 3) || (map > 9)))
-	return false;
-
-      if ((gamemode == shareware)
-	  && ((epsd > 1) || (map > 9)))
-	return false;
-
-      // The source release has this check as map > 34. However, Vanilla
-      // Doom allows IDCLEV up to MAP40 even though it normally crashes.
-      if ((gamemode == commercial)
-	&& (( epsd > 1) || (map > 40)))
-	return false;
+      if (gamemode != commercial)
+      {
+          if (epsd < 1)
+          {
+              return false;
+          }
+          if (epsd > 4)
+          {
+              return false;
+          }
+          if (epsd == 4 && gameversion < exe_ultimate)
+          {
+              return false;
+          }
+          if (map < 1)
+          {
+              return false;
+          }
+          if (map > 9)
+          {
+              return false;
+          }
+      }
+      else
+      {
+          if (map < 1)
+          {
+              return false;
+          }
+          if (map > 40)
+          {
+              return false;
+          }
+      }
 
       // So be it.
       plyr->message = DEH_String(STSTR_CLEV);
@@ -1261,11 +1279,12 @@ void ST_createWidgets(void)
     // weapons owned
     for(i=0;i<6;i++)
     {
-	STlib_initMultIcon(&w_arms[i],
-			   ST_ARMSX+(i%3)*ST_ARMSXSPACE,
-			   ST_ARMSY+(i/3)*ST_ARMSYSPACE,
-			   arms[i], (int *) &plyr->weaponowned[i+1],
-			   &st_armson);
+        STlib_initMultIcon(&w_arms[i],
+                           ST_ARMSX+(i%3)*ST_ARMSXSPACE,
+                           ST_ARMSY+(i/3)*ST_ARMSYSPACE,
+                           arms[i],
+                           &plyr->weaponowned[i+1],
+                           &st_armson);
     }
 
     // frags sum
@@ -1411,6 +1430,6 @@ void ST_Stop (void)
 void ST_Init (void)
 {
     ST_loadData();
-    st_backing_screen = (byte *) Z_Malloc(ST_WIDTH * ST_HEIGHT, PU_STATIC, 0);
+    st_backing_screen = (byte *) Z_Malloc(ST_WIDTH * ST_HEIGHT * sizeof(*st_backing_screen), PU_STATIC, 0);
 }
 
